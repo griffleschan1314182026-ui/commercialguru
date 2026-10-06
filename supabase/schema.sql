@@ -73,7 +73,7 @@ left join (
 -- Daily summary for trend charts.
 create or replace view daily_stats with (security_invoker = on) as
 select listing_type, seen_on, count(*) as price_points,
-       percentile_cont(0.5) within group (order by price_sgd) as median_price
+       percentile_cont(0.5) within group (order by price_history.price_sgd) as median_price
 from price_history join listings using (listing_id)
 group by listing_type, seen_on;
 

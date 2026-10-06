@@ -278,7 +278,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--types", nargs="+", default=["sale", "rent"], choices=list(PATHS))
     ap.add_argument("--max-pages", type=int, default=0, help="0 = all pages")
-    ap.add_argument("--delay", type=float, default=3.0, help="seconds between page requests")
+    ap.add_argument("--delay", type=float, default=0.6, help="seconds between page requests")
     ap.add_argument("--out-dir", default="output")
     ap.add_argument("--dump-html", default=None, help="save first 3 raw pages here for debugging")
     args = ap.parse_args()

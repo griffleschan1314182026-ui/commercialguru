@@ -11,7 +11,7 @@ Daily scrape of Buy and Rent listings on commercialguru.com.sg into Supabase, wi
 
 ## Scope and etiquette
 * Only the public search-result pages `/property-for-sale/N` and `/property-for-rent/N` are read. robots.txt allows these. Listing detail pages are not fetched.
-* About 20 listings per page: ~475 sale pages + ~915 rent pages ≈ 1,400 requests/day, spaced 0.6–0.9 s apart, one at a time; the run backs off on HTTP 429 and stops on 403.
+* About 20 listings per page: ~475 sale pages + ~915 rent pages ≈ 1,400 requests/day, spaced 0.6–0.9 s apart. Buy and Rent run side by side (one connection each); the run backs off on HTTP 429 and stops on 403.
 * The site's Terms of Service (s3.3, s10.1) limit use of its content to personal, non-commercial use and forbid republishing. Keep the dashboard private.
 * If the site answers with a bot challenge or 403 the run stops instead of retrying.
 
@@ -22,7 +22,7 @@ Daily scrape of Buy and Rent listings on commercialguru.com.sg into Supabase, wi
 4. Dashboard: `dashboard/config.json` holds the Supabase URL and public key; `python dashboard/build.py` writes `dashboard/index.html` (live data) for GitHub Pages.
 
 ## Run it daily on your computer
-A full run takes about 30–40 minutes; the computer must be on and awake.
+A full run takes about 20–25 minutes (Rent is the longer half); the computer must be on and awake.
 
 1. Install Python 3.10+ and download this repo (Code → Download ZIP, or `git clone`).
 2. Copy `.env.example` to `.env` and paste your Supabase secret key (Supabase → Project Settings → API Keys). Never commit `.env`.

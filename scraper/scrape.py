@@ -22,7 +22,9 @@ import os
 import random
 import re
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import requests
@@ -236,10 +238,16 @@ class Supabase:
 
 
 # --------------------------------------------------------------------------- main
+# Set when the site blocks us, so the other listing type stops too.
+STOP = threading.Event()
+
+
 def scrape_type(session, listing_type, max_pages, delay, dump_dir):
     rows: dict[int, dict] = {}
     page, last_page = 1, None
     while True:
+        if STOP.is_set():
+            raise Blocked("stopped: the other listing type was blocked")
         url = f"{BASE}{PATHS[listing_type]}" + (f"/{page}" if page > 1 else "")
         html = fetch(session, url)
         if dump_dir and page <= 3:
@@ -292,12 +300,12 @@ def main() -> int:
     if os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_KEY"):
         sb = Supabase(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
 
-    session = requests.Session()
-    session.headers.update({"User-Agent": USER_AGENT, "Accept-Language": "en-SG,en;q=0.9"})
     today = dt.date.today().isoformat()
-    exit_code = 0
 
-    for t in args.types:
+    def run_type(t: str) -> int:
+        # Each type gets its own connection; Buy and Rent run side by side.
+        session = requests.Session()
+        session.headers.update({"User-Agent": USER_AGENT, "Accept-Language": "en-SG,en;q=0.9"})
         run = sb.insert("scrape_runs", {"listing_type": t, "status": "running"}) if sb else None
         try:
             rows, pages = scrape_type(session, t, args.max_pages, args.delay, args.dump_html)
@@ -317,15 +325,19 @@ def main() -> int:
                     "status": "complete" if complete else "partial",
                     "pages": pages, "listings": len(rows),
                     "finished_at": dt.datetime.now(dt.timezone.utc).isoformat()})
-        except Exception as e:  # record the failure, keep going with the other type
+            return 0
+        except Exception as e:  # record the failure; the other type carries on unless blocked
             print(f"[{t}] FAILED: {e}", file=sys.stderr, flush=True)
-            exit_code = 1
+            if isinstance(e, Blocked):
+                STOP.set()
             if sb and run:
                 sb.patch("scrape_runs", f"id=eq.{run['id']}",
                          {"status": "failed", "error": str(e)[:500],
                           "finished_at": dt.datetime.now(dt.timezone.utc).isoformat()})
-            if isinstance(e, Blocked):
-                break
+            return 1
+
+    with ThreadPoolExecutor(max_workers=len(args.types)) as pool:
+        exit_code = max(pool.map(run_type, args.types))
     return exit_code
 
 

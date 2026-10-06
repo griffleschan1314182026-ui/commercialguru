@@ -263,6 +263,17 @@ def scrape_type(session, listing_type, max_pages, delay, dump_dir):
     return list(rows.values()), page
 
 
+def load_env_file() -> None:
+    """Read KEY=value lines from a .env file at the repo root (for local runs)."""
+    env = Path(__file__).resolve().parents[1] / ".env"
+    if not env.exists():
+        return
+    for line in env.read_text(encoding="utf-8").splitlines():
+        key, sep, value = line.strip().partition("=")
+        if sep and not key.startswith("#"):
+            os.environ.setdefault(key.strip(), value.strip().strip('"'))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--types", nargs="+", default=["sale", "rent"], choices=list(PATHS))
@@ -276,6 +287,7 @@ def main() -> int:
     if args.dump_html:
         Path(args.dump_html).mkdir(parents=True, exist_ok=True)
 
+    load_env_file()
     sb = None
     if os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_KEY"):
         sb = Supabase(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])

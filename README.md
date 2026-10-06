@@ -5,7 +5,7 @@ Daily scrape of Buy and Rent listings on commercialguru.com.sg into Supabase, wi
 ## Stack
 | Piece | Choice | Cost |
 |---|---|---|
-| Scheduler | GitHub Actions cron, 03:00 SGT daily (`.github/workflows/daily-scrape.yml`) | Free (private repo: 2,000 min/month; a full run is ~75–90 min, so ~45 h/month. **Use a public repo, or self-host the runner, to stay within free minutes.**) |
+| Scheduler | Your own computer, once a day (`run_daily.sh` / `run_daily.bat`). CommercialGuru blocks GitHub's servers (HTTP 403, 2026-10-06), so the GitHub workflow is manual-only. | Free |
 | Storage | Supabase Postgres (`supabase/schema.sql`) | Free tier: 500 MB, ample for ~30k listings + price changes |
 | Dashboard | `dashboard/index.html`, static page reading Supabase with the read-only anon key | Free on GitHub Pages |
 
@@ -20,6 +20,17 @@ Daily scrape of Buy and Rent listings on commercialguru.com.sg into Supabase, wi
 2. GitHub repo: push this folder; add secrets `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` (service-role key).
 3. Actions → "Daily CommercialGuru scrape" → Run workflow with `max_pages = 2` as a smoke test. Check the log and the `output/debug/*.html` artifact.
 4. Dashboard: `dashboard/config.json` holds the Supabase URL and public key; `python dashboard/build.py` writes `dashboard/index.html` (live data) for GitHub Pages.
+
+## Run it daily on your computer
+A full run takes about 75–90 minutes; the computer must be on and awake.
+
+1. Install Python 3.10+ and download this repo (Code → Download ZIP, or `git clone`).
+2. Copy `.env.example` to `.env` and paste your Supabase secret key (Supabase → Project Settings → API Keys). Never commit `.env`.
+3. Test once with 2 pages: `python scraper/scrape.py --types sale rent --max-pages 2`
+4. Schedule it:
+   * **Windows:** Task Scheduler → Create Basic Task → Daily, 3:00 AM → Start a program → browse to `run_daily.bat`. Tick "Wake the computer to run this task" under Conditions.
+   * **macOS / Linux:** `crontab -e` and add `0 3 * * * /full/path/to/commercialguru/run_daily.sh`
+5. Logs go to `logs/`; each run is also recorded in the `scrape_runs` table in Supabase.
 
 ## Local run
 ```

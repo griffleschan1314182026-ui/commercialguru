@@ -242,6 +242,17 @@ class Supabase:
         r.raise_for_status()
         return r.json()[0]
 
+    def count(self, table: str, match: str) -> int:
+        r = requests.get(f"{self.url}/{table}?{match}&select=listing_id",
+                         headers={**self.h, "Prefer": "count=exact", "Range": "0-0"}, timeout=60)
+        r.raise_for_status()
+        return int(r.headers.get("Content-Range", "*/0").split("/")[-1] or 0)
+
+    def rpc(self, fn: str, args: dict):
+        r = requests.post(f"{self.url}/rpc/{fn}", headers=self.h, data=json.dumps(args), timeout=120)
+        r.raise_for_status()
+        return r.json()
+
     def patch(self, table: str, match: str, row: dict) -> None:
         r = requests.patch(f"{self.url}/{table}?{match}", headers=self.h,
                            data=json.dumps(row), timeout=30)
@@ -330,9 +341,18 @@ def main() -> int:
                         "tenure", "agency", "posted_on"]
                 # PostgREST bulk upserts need every row to carry the same keys.
                 rows = [{**{k: r.get(k) for k in keys}, "last_seen": today} for r in rows]
+                # Partial (--max-pages) runs must not make unseen listings look delisted,
+                # nor may a run that stopped early (far fewer listings than were active).
+                active_before = sb.count("listings", f"listing_type=eq.{t}&delisted_on=is.null")
+                complete = not args.max_pages and len(rows) >= 0.8 * active_before
+                if not args.max_pages and not complete:
+                    print(f"[{t}] only {len(rows)} listings vs {active_before} active before; "
+                          "not marking anything delisted", file=sys.stderr, flush=True)
                 sb.upsert("listings", rows, "listing_id")
-                # Partial (--max-pages) runs must not make unseen listings look delisted.
-                complete = not args.max_pages
+                if complete:
+                    # Anything of this type not seen today has left the site.
+                    gone = sb.rpc("mark_delisted", {"p_type": t, "p_date": today})
+                    print(f"[{t}] {gone} listings no longer on the site", flush=True)
                 sb.patch("scrape_runs", f"id=eq.{run['id']}", {
                     "status": "complete" if complete else "partial",
                     "pages": pages, "listings": len(rows),

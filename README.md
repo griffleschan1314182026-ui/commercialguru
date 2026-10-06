@@ -21,6 +21,12 @@ Daily scrape of Buy and Rent listings on commercialguru.com.sg into Supabase, wi
 3. Actions → "Daily CommercialGuru scrape" → Run workflow with `max_pages = 2` as a smoke test. Check the log and the `output/debug/*.html` artifact.
 4. Dashboard: `dashboard/config.json` holds the Supabase URL and public key; `python dashboard/build.py` writes `dashboard/index.html` (live data) for GitHub Pages.
 
+## Database setup
+In the Supabase SQL Editor, run `supabase/schema.sql`, then `supabase/002_history.sql` (both are safe to re-run).
+`002_history.sql` adds listing history: every price or detail change is logged in `listing_changes`, and
+listings that disappear get a `delisted_on` date instead of being deleted. A listing that comes back is
+logged as relisted.
+
 ## Mac: double-click setup
 1. `git clone` this repo (or Download ZIP) into your home folder.
 2. Double-click **Install Daily Scrape.command** once. It asks for the Supabase URL and keys, sets up Python, and schedules a scrape every morning at 7:00 (if the Mac is asleep then, it runs when the Mac wakes).

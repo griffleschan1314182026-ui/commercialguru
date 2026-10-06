@@ -21,7 +21,14 @@ Daily scrape of Buy and Rent listings on commercialguru.com.sg into Supabase, wi
 3. Actions → "Daily CommercialGuru scrape" → Run workflow with `max_pages = 2` as a smoke test. Check the log and the `output/debug/*.html` artifact.
 4. Dashboard: `dashboard/config.json` holds the Supabase URL and public key; `python dashboard/build.py` writes `dashboard/index.html` (live data) for GitHub Pages.
 
-## Run it daily on your computer
+## Mac: double-click setup
+1. `git clone` this repo (or Download ZIP) into your home folder.
+2. Double-click **Install Daily Scrape.command** once. It asks for the Supabase URL and keys, sets up Python, and schedules a scrape every morning at 7:00 (if the Mac is asleep then, it runs when the Mac wakes).
+3. Double-click **Open Dashboard.command** to view listings, or **Run Scrape Now.command** to update right away.
+
+To stop the daily run: `launchctl bootout gui/$(id -u)/sg.commercialguru.scrape`
+
+## Run it daily on your computer (manual)
 A full run takes about 20–25 minutes (Rent is the longer half); the computer must be on and awake.
 
 1. Install Python 3.10+ and download this repo (Code → Download ZIP, or `git clone`).

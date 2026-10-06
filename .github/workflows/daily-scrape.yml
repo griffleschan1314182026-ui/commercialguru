@@ -1,0 +1,37 @@
+name: Daily CommercialGuru scrape
+
+on:
+  # Daily schedule is switched on after the first test run succeeds:
+  # schedule:
+  #   - cron: "0 19 * * *"   # 03:00 Singapore time (UTC+8)
+  workflow_dispatch:
+    inputs:
+      max_pages:
+        description: "Pages per type (0 = all). Use 2 for a smoke test."
+        default: "0"
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r scraper/requirements.txt
+      - name: Scrape Buy and Rent listings
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: >
+          python scraper/scrape.py --types sale rent
+          --max-pages ${{ github.event.inputs.max_pages || '0' }}
+          --out-dir output --dump-html output/debug
+      - name: Keep raw output for 14 days
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrape-${{ github.run_id }}
+          path: output/
+          retention-days: 14

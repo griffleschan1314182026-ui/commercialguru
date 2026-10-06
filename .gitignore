@@ -1,0 +1,6 @@
+output/
+debug/
+__pycache__/
+dashboard/index.html
+dashboard/with-sample.html
+dashboard/config.json

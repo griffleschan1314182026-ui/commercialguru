@@ -213,8 +213,11 @@ def parse_page(html: str, listing_type: str) -> tuple[list[dict], int | None]:
 class Supabase:
     def __init__(self, url: str, key: str):
         self.url = url.rstrip("/") + "/rest/v1"
-        self.h = {"apikey": key, "Authorization": f"Bearer {key}",
-                  "Content-Type": "application/json"}
+        self.h = {"apikey": key, "Content-Type": "application/json"}
+        # Legacy service_role keys are JWTs and also go in Authorization.
+        # New sb_secret_ keys must not: Supabase rejects them there with 401.
+        if key.startswith("eyJ"):
+            self.h["Authorization"] = f"Bearer {key}"
 
     def upsert(self, table: str, rows: list[dict], conflict: str) -> None:
         for i in range(0, len(rows), 500):
@@ -306,8 +309,9 @@ def main() -> int:
         # Each type gets its own connection; Buy and Rent run side by side.
         session = requests.Session()
         session.headers.update({"User-Agent": USER_AGENT, "Accept-Language": "en-SG,en;q=0.9"})
-        run = sb.insert("scrape_runs", {"listing_type": t, "status": "running"}) if sb else None
+        run = None
         try:
+            run = sb.insert("scrape_runs", {"listing_type": t, "status": "running"}) if sb else None
             rows, pages = scrape_type(session, t, args.max_pages, args.delay, args.dump_html)
             out = Path(args.out_dir, f"{t}-{today}.jsonl")
             out.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in rows), encoding="utf-8")
@@ -328,12 +332,19 @@ def main() -> int:
             return 0
         except Exception as e:  # record the failure; the other type carries on unless blocked
             print(f"[{t}] FAILED: {e}", file=sys.stderr, flush=True)
+            if isinstance(e, requests.HTTPError) and e.response is not None and e.response.status_code == 401:
+                print("    Supabase refused the key. Check SUPABASE_SERVICE_KEY in .env is the "
+                      "secret (sb_secret_...) or service_role key, not the publishable one.",
+                      file=sys.stderr, flush=True)
             if isinstance(e, Blocked):
                 STOP.set()
             if sb and run:
-                sb.patch("scrape_runs", f"id=eq.{run['id']}",
-                         {"status": "failed", "error": str(e)[:500],
-                          "finished_at": dt.datetime.now(dt.timezone.utc).isoformat()})
+                try:
+                    sb.patch("scrape_runs", f"id=eq.{run['id']}",
+                             {"status": "failed", "error": str(e)[:500],
+                              "finished_at": dt.datetime.now(dt.timezone.utc).isoformat()})
+                except requests.RequestException:
+                    pass
             return 1
 
     with ThreadPoolExecutor(max_workers=len(args.types)) as pool:

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import html as htmllib
 import json
 import os
 import random
@@ -141,6 +142,10 @@ def parse_card(card, listing_id: str, href: str, listing_type: str) -> dict:
             if t and (title is None or len(t) > len(title)):
                 title = t
 
+    if title:
+        # Link titles read "For Sale <name>" and can carry escaped entities (&amp;).
+        title = re.sub(r"^For (Sale|Rent)\s+", "", htmllib.unescape(title)).strip()
+
     # Titles often contain numbers ("3,875 sqft", "$6800"); match on the rest.
     if title:
         text = text.replace(title, " ")
@@ -165,6 +170,9 @@ def parse_card(card, listing_id: str, href: str, listing_type: str) -> dict:
         (l for l in lines if " / " in l and l not in PROPERTY_TYPES and "S$" not in l and len(l) < 60),
         None,
     )
+    if location and ", " in location:
+        # Some cards join street and district group: "1 North Bridge Road, City Hall / Clarke Quay".
+        location = location.rsplit(", ", 1)[1]
     tenure_m = TENURE_RE.search(text)
     posted_m = POSTED_RE.search(text)
 
